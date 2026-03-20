@@ -10,14 +10,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signInWithPopup } from "firebase/auth";
 import { auth, provider } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/useAuth";
+
+
 
 
 export default function LoginPage() {
+  const { user, loading } = useAuth();
+const router = useRouter();
+
+useEffect(() => {
+  if (!loading && user) {
+    router.push("/dashboard");
+  }
+}, [user, loading]);
+
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [errorMsg, setErrorMsg] = useState("")
+  
   const handleGoogleLogin = async () => {
   try {
     const result = await signInWithPopup(auth, provider);
@@ -33,14 +48,34 @@ export default function LoginPage() {
   }
 };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    router.push("/dashboard")
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+
+    router.push("/dashboard");
+
+  } catch (error: any) {
+  console.error(error.code);
+
+  if (error.code === "auth/email-already-in-use") {
+    setErrorMsg("Account already exists. Please login.");
+  } else if (error.code === "auth/invalid-credential") {
+    setErrorMsg("Invalid email or password.");
+  } else if (error.code === "auth/weak-password") {
+    setErrorMsg("Password must be at least 6 characters.");
+  } else {
+    setErrorMsg("Something went wrong. Try again.");
   }
+}
+
+
+  setIsLoading(false);
+};
+
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 
@@ -96,6 +131,12 @@ transition-all"
                 />
               </div>
             </div>
+  {/* 🔴 ERROR MESSAGE */}
+  {errorMsg && (
+    <p className="text-red-500 text-sm text-center">
+      {errorMsg}
+    </p>
+  )}
 
             {/* Password */}
             <div className="space-y-2">
@@ -108,7 +149,11 @@ transition-all"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/50"
+                  className="pl-10 pr-10 h-12 bg-zinc-900/80 border border-zinc-700 
+text-foreground placeholder:text-muted-foreground 
+focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 
+transition-all"
+
                   required
                 />
                 <button
@@ -120,6 +165,12 @@ transition-all"
                 </button>
               </div>
             </div>
+  {/* 🔴 ERROR MESSAGE */}
+  {errorMsg && (
+    <p className="text-red-500 text-sm text-center">
+      {errorMsg}
+    </p>
+  )}
 
             {/* Forgot Password */}
             <div className="flex justify-end">

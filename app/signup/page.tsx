@@ -8,23 +8,85 @@ import { Mail, Lock, Eye, EyeOff, User, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/useAuth";
+
+
+
 
 export default function SignupPage() {
+  const { user, loading } = useAuth();
+const router = useRouter();
+
+useEffect(() => {
+  if (!loading && user) {
+    router.push("/dashboard");
+  }
+}, [user, loading]);
+
   const [showPassword, setShowPassword] = useState(false)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const [errorMsg, setErrorMsg] = useState("")
+  
+  const handleGoogleSignup = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate signup
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    router.push("/dashboard")
+    router.push("/dashboard");
+
+  } catch (error) {
+    console.error(error);
   }
+};
+
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    const user = userCredential.user;
+
+    // Save name to Firebase user profile
+    await updateProfile(user, {
+      displayName: name,
+    });
+
+    console.log("User created:", user);
+
+    router.push("/dashboard");
+
+  } catch (error: any) {
+  console.error(error.code);
+
+  if (error.code === "auth/email-already-in-use") {
+    setErrorMsg("Account already exists. Please login.");
+  } else if (error.code === "auth/invalid-credential") {
+    setErrorMsg("Invalid email or password.");
+  } else if (error.code === "auth/weak-password") {
+    setErrorMsg("Password must be at least 6 characters.");
+  } else {
+    setErrorMsg("Something went wrong. Try again.");
+  }
+}
+
+
+  setIsLoading(false);
+};
+
 
   return (
     <div className="min-h-screen gradient-mesh flex items-center justify-center p-4">
@@ -83,6 +145,12 @@ export default function SignupPage() {
                 />
               </div>
             </div>
+             {/* 🔴 ERROR MESSAGE */}
+  {errorMsg && (
+    <p className="text-red-500 text-sm text-center">
+      {errorMsg}
+    </p>
+  )}
 
             {/* Password */}
             <div className="space-y-2">
@@ -107,13 +175,32 @@ export default function SignupPage() {
                 </button>
               </div>
             </div>
+             {/* 🔴 ERROR MESSAGE */}
+  {errorMsg && (
+    <p className="text-red-500 text-sm text-center">
+      {errorMsg}
+    </p>
+  )}
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-all"
-              disabled={isLoading}
-            >
+
+
+              <Button
+  type="submit"
+  className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-all"
+  disabled={isLoading}
+>
+  {isLoading ? (
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
+    />
+  ) : (
+    "Create Account"
+  )}
+</Button>
+
+            
               {isLoading ? (
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -123,7 +210,7 @@ export default function SignupPage() {
               ) : (
                 "Create Account"
               )}
-            </Button>
+            
 
             {/* Divider */}
             <div className="relative my-6">
@@ -135,9 +222,12 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* Google Button */}
+
+          </form>
+                      {/* Google Button OUTSIDE*/}
             <Button
               type="button"
+              onClick={handleGoogleSignup}
               variant="outline"
               className="w-full h-12 bg-secondary border-border text-foreground hover:bg-secondary/80 font-medium"
             >
@@ -161,7 +251,6 @@ export default function SignupPage() {
               </svg>
               Continue with Google
             </Button>
-          </form>
 
           {/* Terms */}
           <p className="mt-6 text-center text-sm text-muted-foreground">

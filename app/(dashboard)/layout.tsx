@@ -5,6 +5,20 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { TopNavbar } from "@/components/top-navbar"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/useAuth";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+
+const handleLogout = async () => {
+  await signOut(auth);
+};
+<button onClick={handleLogout}>
+  Logout
+</button>
+
+
 
 export default function DashboardLayout({
   children,
@@ -12,6 +26,16 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, loading } = useAuth();
+const router = useRouter();
+
+useEffect(() => {
+  if (!loading && !user) {
+    router.push("/login");
+  }
+}, [user, loading]);
+
+
 
   return (
     <div className="min-h-screen bg-background">

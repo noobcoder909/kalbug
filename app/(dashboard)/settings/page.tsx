@@ -1,4 +1,7 @@
 "use client"
+import { useAuth } from "@/lib/useAuth";
+import { useEffect } from "react";
+import { updateProfile } from "firebase/auth";
 
 import { useState } from "react"
 import { motion } from "framer-motion"
@@ -16,12 +19,35 @@ import {
 } from "@/components/ui/select"
 
 export default function SettingsPage() {
+  const handleSave = async () => {
+  if (!user) return;
+
+  try {
+    await updateProfile(user, {
+      displayName: name,
+    });
+
+    alert("Profile updated!");
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+  const { user, loading } = useAuth();
+
   const [name, setName] = useState("John Doe")
   const [email, setEmail] = useState("john@example.com")
   const [currency, setCurrency] = useState("INR")
   const [notifications, setNotifications] = useState(true)
   const [weeklyReport, setWeeklyReport] = useState(true)
   const [budgetAlerts, setBudgetAlerts] = useState(true)
+  useEffect(() => {
+  if (user) {
+    setName(user.displayName || "");
+    setEmail(user.email || "");
+  }
+}, [user]);
+
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -81,9 +107,13 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-              Save Changes
-            </Button>
+<Button
+  onClick={handleSave}
+  className="bg-primary text-primary-foreground hover:bg-primary/90"
+>
+  Save Changes
+</Button>
+
           </div>
         </div>
       </motion.div>

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { motion } from "framer-motion"
 import { Wallet, TrendingDown, PiggyBank, Target, TrendingUp } from "lucide-react"
@@ -6,6 +6,9 @@ import { BudgetCard } from "@/components/dashboard/budget-card"
 import { ExpenseChart } from "@/components/dashboard/expense-chart"
 import { CategoryChart } from "@/components/dashboard/category-chart"
 import { RecentTransactions } from "@/components/dashboard/recent-transactions"
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/useAuth";
 
 export default function DashboardPage() {
   return (
