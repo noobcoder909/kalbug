@@ -8,6 +8,9 @@ import { Mail, Lock, Eye, EyeOff, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { signInWithPopup } from "firebase/auth";
+import { auth, provider } from "@/lib/firebase";
+
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -15,6 +18,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const handleGoogleLogin = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+
+    const user = result.user;
+
+    console.log(user); // name, email, photo
+
+    router.push("/dashboard");
+
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -144,6 +161,7 @@ hover:scale-[1.02] active:scale-[0.98]"
             {/* Google Button */}
             <Button
               type="button"
+              onClick={handleGoogleLogin}
               variant="outline"
               className="w-full h-12 bg-white/5 border border-white/10 
 text-foreground hover:bg-white/10 
