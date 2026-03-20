@@ -26,23 +26,33 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen gradient-mesh flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 
+bg-gradient-to-br from-black via-zinc-900 to-emerald-950 relative overflow-hidden"
+>
+  <div className="absolute inset-0 flex justify-center items-center">
+  <div className="w-[500px] h-[500px] bg-emerald-500/10 blur-[120px] rounded-full"></div>
+</div>
+
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center 
+shadow-lg shadow-emerald-500/30">
+
             <Wallet className="w-5 h-5 text-primary-foreground" />
           </div>
           <span className="text-2xl font-semibold text-foreground">BudgetFlow</span>
         </div>
 
         {/* Card */}
-        <div className="glass rounded-2xl p-8 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 
+rounded-2xl p-8 shadow-2xl relative z-10">
+
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-foreground mb-2">Welcome back</h1>
             <p className="text-muted-foreground">Sign in to manage your budget</p>
@@ -60,7 +70,11 @@ export default function LoginPage() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-12 bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/50"
+                  className="pl-10 h-12 bg-zinc-900/80 border border-zinc-700 
+text-foreground placeholder:text-muted-foreground 
+focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 
+transition-all"
+
                   required
                 />
               </div>
@@ -100,7 +114,10 @@ export default function LoginPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-medium transition-all"
+              className="w-full h-12 bg-emerald-500 text-black font-semibold 
+hover:bg-emerald-400 transition-all 
+hover:scale-[1.02] active:scale-[0.98]"
+
               disabled={isLoading}
             >
               {isLoading ? (
@@ -110,7 +127,7 @@ export default function LoginPage() {
                   className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
                 />
               ) : (
-                "Sign In"
+                "Continue"
               )}
             </Button>
 
@@ -120,7 +137,7 @@ export default function LoginPage() {
                 <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-card text-muted-foreground">or continue with</span>
+                <span className="px-4 bg-zinc-900 text-muted-foreground">or continue with</span>
               </div>
             </div>
 
@@ -128,7 +145,10 @@ export default function LoginPage() {
             <Button
               type="button"
               variant="outline"
-              className="w-full h-12 bg-secondary border-border text-foreground hover:bg-secondary/80 font-medium"
+              className="w-full h-12 bg-white/5 border border-white/10 
+text-foreground hover:bg-white/10 
+transition-all hover:scale-[1.02]"
+
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
