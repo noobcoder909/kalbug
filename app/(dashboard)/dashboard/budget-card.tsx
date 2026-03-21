@@ -1,16 +1,15 @@
-import React from "react";
-import { cn } from "@/lib/utils"; // optional
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-type BudgetCardProps = {
+interface BudgetCardProps {
   title: string;
-  value?: string | number | React.ReactNode;
+  value: React.ReactNode;
   change: string;
   changeType: "positive" | "negative" | "neutral";
   icon: React.ElementType;
   iconColor: string;
-  children?: React.ReactNode;
-  onClick?: () => void;
-};
+  onClick?: () => void; // <-- add this
+}
 
 export function BudgetCard({
   title,
@@ -19,38 +18,42 @@ export function BudgetCard({
   changeType,
   icon: Icon,
   iconColor,
-  children,
   onClick,
 }: BudgetCardProps) {
   return (
-    <div className="bg-card p-4 rounded-lg hover:bg-card/80 transition">
-      <div className="flex justify-between items-center">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: onClick ? 1.02 : 1 }} // small hover effect only if clickable
+      transition={{ duration: 0.3 }}
+      className="bg-card/50 backdrop-blur-sm border-border rounded-lg cursor-pointer"
+      onClick={onClick} // <-- use the onClick here
+    >
+      <div className="flex items-center justify-between p-6">
         <div>
           <p className="text-sm text-muted-foreground">{title}</p>
-          {/* Clickable value area */}
-          <div onClick={onClick} className="mt-1">
-            {children || value}
-          </div>
+          <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+          <p
+            className={cn(
+              "text-sm mt-2",
+              changeType === "positive"
+                ? "text-green-500"
+                : changeType === "negative"
+                ? "text-red-500"
+                : "text-muted-foreground"
+            )}
+          >
+            {change}
+          </p>
         </div>
         <div className={cn("p-3 rounded-lg", iconColor)}>
           <Icon className="w-5 h-5 text-primary-foreground" />
         </div>
       </div>
-      <p
-        className={cn(
-          "text-sm mt-1",
-          changeType === "positive"
-            ? "text-green-500"
-            : changeType === "negative"
-            ? "text-red-500"
-            : "text-gray-500"
-        )}
-      >
-        {change}
-      </p>
-    </div>
+    </motion.div>
   );
 }
+
 
 
 

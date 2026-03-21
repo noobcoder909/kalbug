@@ -98,7 +98,7 @@ shadow-lg shadow-emerald-500/30">
 
             <Wallet className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-2xl font-semibold text-foreground">BudgetFlow</span>
+          <span className="text-2xl font-semibold text-foreground">KalBudget</span>
         </div>
 
         {/* Card */}

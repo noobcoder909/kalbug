@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Users, ArrowUpRight, ArrowDownLeft, Plus, Trash2, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useExpenses } from "@/lib/expenses-context"
 
 interface Friend {
   id: string
@@ -38,7 +39,7 @@ interface Friend {
   borrowed: number
 }
 
-interface Transaction {
+interface FriendTransaction {
   id: string
   friendName: string
   type: "lent" | "borrowed"
@@ -46,25 +47,14 @@ interface Transaction {
   date: string
 }
 
-const initialFriends: Friend[] = [
-  { id: "1", name: "Rahul Sharma", lent: 2500, borrowed: 1000 },
-  { id: "2", name: "Priya Patel", lent: 500, borrowed: 1500 },
-  { id: "3", name: "Amit Kumar", lent: 3000, borrowed: 0 },
-  { id: "4", name: "Sneha Gupta", lent: 0, borrowed: 2000 },
-]
-
-const initialTransactions: Transaction[] = [
-  { id: "1", friendName: "Rahul Sharma", type: "lent", amount: 1500, date: "2024-03-15" },
-  { id: "2", friendName: "Priya Patel", type: "borrowed", amount: 1500, date: "2024-03-14" },
-  { id: "3", friendName: "Amit Kumar", type: "lent", amount: 3000, date: "2024-03-12" },
-  { id: "4", friendName: "Sneha Gupta", type: "borrowed", amount: 2000, date: "2024-03-10" },
-  { id: "5", friendName: "Rahul Sharma", type: "lent", amount: 1000, date: "2024-03-08" },
-  { id: "6", friendName: "Rahul Sharma", type: "borrowed", amount: 1000, date: "2024-03-05" },
-]
+const STORAGE_KEY = "friends-data-v2"
 
 export default function FriendsPage() {
-  const [friends, setFriends] = useState<Friend[]>(initialFriends)
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
+  const { addExpense } = useExpenses()
+
+  const [friends, setFriends] = useState<Friend[]>([])
+  const [transactions, setTransactions] = useState<FriendTransaction[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [newTransaction, setNewTransaction] = useState({
     friendName: "",
@@ -73,34 +63,49 @@ export default function FriendsPage() {
     date: new Date().toISOString().split("T")[0],
   })
 
+  // Load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      setFriends(parsed.friends || [])
+      setTransactions(parsed.transactions || [])
+    }
+    setIsLoaded(true)
+  }, [])
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    if (!isLoaded) return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ friends, transactions }))
+  }, [friends, transactions, isLoaded])
+
   const totalLent = friends.reduce((acc, f) => acc + f.lent, 0)
   const totalBorrowed = friends.reduce((acc, f) => acc + f.borrowed, 0)
   const netBalance = totalLent - totalBorrowed
 
   const handleAddTransaction = () => {
     if (!newTransaction.friendName || !newTransaction.amount) return
-
     const amount = parseFloat(newTransaction.amount)
     if (isNaN(amount) || amount <= 0) return
 
-    // Add transaction
-    const transaction: Transaction = {
+    // Add to friend transactions list
+    const transaction: FriendTransaction = {
       id: Date.now().toString(),
       friendName: newTransaction.friendName,
       type: newTransaction.type,
       amount,
       date: newTransaction.date,
     }
-    setTransactions([transaction, ...transactions])
+    setTransactions((prev) => [transaction, ...prev])
 
-    // Update or add friend
+    // Update or add friend balance
     const existingFriend = friends.find(
       (f) => f.name.toLowerCase() === newTransaction.friendName.toLowerCase()
     )
-
     if (existingFriend) {
-      setFriends(
-        friends.map((f) =>
+      setFriends((prev) =>
+        prev.map((f) =>
           f.id === existingFriend.id
             ? {
                 ...f,
@@ -117,7 +122,23 @@ export default function FriendsPage() {
         lent: newTransaction.type === "lent" ? amount : 0,
         borrowed: newTransaction.type === "borrowed" ? amount : 0,
       }
-      setFriends([...friends, newFriend])
+      setFriends((prev) => [...prev, newFriend])
+    }
+
+    // Lent = money goes out → expense (balance decreases, counted as expense)
+    // Borrowed = money comes in → deposit (balance increases)
+    if (newTransaction.type === "lent") {
+      addExpense({
+        description: `Lent to ${newTransaction.friendName}`,
+        amount,
+        type: "expense",
+      } as any)
+    } else {
+      addExpense({
+        description: `Borrowed from ${newTransaction.friendName}`,
+        amount,
+        type: "deposit",
+      } as any)
     }
 
     setNewTransaction({
@@ -133,9 +154,9 @@ export default function FriendsPage() {
     const transaction = transactions.find((t) => t.id === id)
     if (!transaction) return
 
-    // Update friend balance
-    setFriends(
-      friends.map((f) => {
+    // Reverse the friend balance
+    setFriends((prev) =>
+      prev.map((f) => {
         if (f.name.toLowerCase() === transaction.friendName.toLowerCase()) {
           return {
             ...f,
@@ -146,8 +167,7 @@ export default function FriendsPage() {
         return f
       })
     )
-
-    setTransactions(transactions.filter((t) => t.id !== id))
+    setTransactions((prev) => prev.filter((t) => t.id !== id))
   }
 
   return (
@@ -169,28 +189,27 @@ export default function FriendsPage() {
             <DialogHeader>
               <DialogTitle className="text-foreground">Add Transaction</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Record a new lending or borrowing transaction with a friend.
+                Record a new lending or borrowing transaction.
+                {newTransaction.type === "lent" && (
+                  <span className="block mt-1 text-primary font-medium">
+                    💡 Lending money will be recorded as an expense.
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="friendName" className="text-foreground">
-                  Friend Name
-                </Label>
+                <Label htmlFor="friendName" className="text-foreground">Friend Name</Label>
                 <Input
                   id="friendName"
                   value={newTransaction.friendName}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, friendName: e.target.value })
-                  }
+                  onChange={(e) => setNewTransaction({ ...newTransaction, friendName: e.target.value })}
                   placeholder="Enter friend's name"
                   className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="type" className="text-foreground">
-                  Type
-                </Label>
+                <Label htmlFor="type" className="text-foreground">Type</Label>
                 <Select
                   value={newTransaction.type}
                   onValueChange={(value: "lent" | "borrowed") =>
@@ -202,7 +221,7 @@ export default function FriendsPage() {
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
                     <SelectItem value="lent" className="text-foreground hover:bg-secondary cursor-pointer">
-                      Lent (You gave money)
+                      Lent (You gave money) — counts as expense
                     </SelectItem>
                     <SelectItem value="borrowed" className="text-foreground hover:bg-secondary cursor-pointer">
                       Borrowed (You received money)
@@ -211,31 +230,23 @@ export default function FriendsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="amount" className="text-foreground">
-                  Amount (INR)
-                </Label>
+                <Label htmlFor="amount" className="text-foreground">Amount (₹)</Label>
                 <Input
                   id="amount"
                   type="number"
                   value={newTransaction.amount}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, amount: e.target.value })
-                  }
+                  onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
                   placeholder="Enter amount"
                   className="bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date" className="text-foreground">
-                  Date
-                </Label>
+                <Label htmlFor="date" className="text-foreground">Date</Label>
                 <Input
                   id="date"
                   type="date"
                   value={newTransaction.date}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, date: e.target.value })
-                  }
+                  onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
                   className="bg-secondary border-border text-foreground"
                 />
               </div>
@@ -326,7 +337,7 @@ export default function FriendsPage() {
         <div className="space-y-3">
           <AnimatePresence>
             {friends.map((friend, index) => {
-              const netBalance = friend.lent - friend.borrowed
+              const net = friend.lent - friend.borrowed
               return (
                 <motion.div
                   key={friend.id}
@@ -351,17 +362,20 @@ export default function FriendsPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-lg font-bold ${netBalance >= 0 ? "text-success" : "text-destructive"}`}>
-                      {netBalance >= 0 ? "+" : ""}₹{netBalance.toLocaleString()}
+                    <p className={`text-lg font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>
+                      {net >= 0 ? "+" : ""}₹{net.toLocaleString()}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {netBalance >= 0 ? "They owe you" : "You owe them"}
+                      {net >= 0 ? "They owe you" : "You owe them"}
                     </p>
                   </div>
                 </motion.div>
               )
             })}
           </AnimatePresence>
+          {friends.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">No friends added yet. Add a transaction to get started.</p>
+          )}
         </div>
       </motion.div>
 
@@ -412,6 +426,9 @@ export default function FriendsPage() {
                           <ArrowDownLeft className="w-3 h-3" />
                         )}
                         {transaction.type === "lent" ? "Lent" : "Borrowed"}
+                        {transaction.type === "lent" && (
+                          <span className="ml-1 text-xs opacity-70">(expense)</span>
+                        )}
                       </span>
                     </TableCell>
                     <TableCell className="text-foreground">
@@ -443,6 +460,9 @@ export default function FriendsPage() {
               </AnimatePresence>
             </TableBody>
           </Table>
+          {transactions.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">No transactions yet.</p>
+          )}
         </div>
       </motion.div>
     </div>

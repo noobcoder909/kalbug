@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "framer-motion"
-import { LayoutDashboard, Receipt, Settings, Wallet, LogOut, PiggyBank, Users, Plane } from "lucide-react"
+import { LayoutDashboard, Receipt, Settings, Wallet, LogOut, PiggyBank, Users, Plane, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/friends", label: "Friends", icon: Users },
   { href: "/trips", label: "Trips", icon: Plane },
+  { href: "/report", label: "Report", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 

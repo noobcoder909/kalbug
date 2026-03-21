@@ -101,7 +101,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
             <Wallet className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-2xl font-semibold text-foreground">BudgetFlow</span>
+          <span className="text-2xl font-semibold text-foreground">KalBudget</span>
         </div>
 
         {/* Card */}

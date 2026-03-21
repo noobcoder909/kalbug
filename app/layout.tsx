@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { ExpensesProvider } from "@/lib/expenses-context";
+
+
 
 const geist = Geist({ 
   subsets: ["latin"],
@@ -13,7 +16,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'BudgetFlow - Student Budget Tracker',
+  title: 'KalBudget - Budget Tracker',
   description: 'A modern fintech-style student budget web app to track expenses and manage your finances',
   generator: 'v0.app',
   icons: {
@@ -41,17 +44,14 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
-        {children}
-        <Analytics />
+    <html lang="en">
+      <body>
+        <ExpensesProvider>
+          {children}
+        </ExpensesProvider>
       </body>
     </html>
-  )
+  );
 }
