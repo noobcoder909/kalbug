@@ -1,14 +1,7 @@
 "use client"
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
-import { sendPasswordResetEmail } from "firebase/auth";
 
-import { useAuth } from "@/lib/useAuth";
-import { useEffect } from "react";
-import { updateProfile } from "firebase/auth";
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { User, Mail, Bell, Shield, Palette, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,47 +9,33 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { useAuth } from "@/lib/useAuth"
+import { signOut, sendPasswordReset } from "@/lib/backendless-auth"
+
+const APP_ID = "A5192853-9A56-481E-9288-FC1D7ACD96D3"
+const REST_KEY = "A5570974-1283-4AB2-AD8E-40797731D561"
+
+async function updateUserProfile(objectId: string, token: string, data: { name: string }) {
+  const res = await fetch(
+    `https://api.backendless.com/${APP_ID}/${REST_KEY}/users/${objectId}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "user-token": token,
+      },
+      body: JSON.stringify(data),
+    }
+  )
+  if (!res.ok) throw new Error("Failed to update profile")
+  return res.json()
+}
 
 export default function SettingsPage() {
-  const handleSave = async () => {
-  if (!user) return;
-
-  try {
-    await updateProfile(user, {
-      displayName: name,
-    });
-
-    alert("Profile updated!");
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-  const { user, loading } = useAuth();
-const handleChangePassword = async () => {
-  if (!user?.email) return;
-
-  try {
-    await sendPasswordResetEmail(auth, user.email);
-    alert("Password reset email sent!");
-  } catch (error) {
-    console.error(error);
-    alert("Failed to send reset email.");
-  }
-};
-
-  useEffect(() => {
-  if (user) {
-    setName(user.displayName || "");
-    setEmail(user.email || "");
-  }
-}, [user]);
+  const { user, setUser } = useAuth()
+  const router = useRouter()
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -64,23 +43,48 @@ const handleChangePassword = async () => {
   const [notifications, setNotifications] = useState(true)
   const [weeklyReport, setWeeklyReport] = useState(true)
   const [budgetAlerts, setBudgetAlerts] = useState(true)
+  const [saveMsg, setSaveMsg] = useState("")
+  const [resetMsg, setResetMsg] = useState("")
+
   useEffect(() => {
-  if (user) {
-    setName(user.displayName || "");
-    setEmail(user.email || "");
-  }
-}, [user]);
+    if (user) {
+      setName(user.displayName || "")
+      setEmail(user.email || "")
+    }
+  }, [user])
 
-const router = useRouter();
-
-const handleLogout = async () => {
-  try {
-    await signOut(auth);
-    router.push("/login");
-  } catch (error) {
-    console.error(error);
+  const handleSave = async () => {
+    if (!user) return
+    try {
+      const token = localStorage.getItem("bl_token") || ""
+      await updateUserProfile(user.objectId, token, { name })
+      // Update local session
+      const updated = { ...user, name, displayName: name }
+      localStorage.setItem("bl_user", JSON.stringify(updated))
+      setUser(updated)
+      setSaveMsg("Profile updated!")
+      setTimeout(() => setSaveMsg(""), 3000)
+    } catch {
+      setSaveMsg("Failed to update. Try again.")
+    }
   }
-};
+
+  const handleChangePassword = async () => {
+    if (!user?.email) return
+    try {
+      await sendPasswordReset(user.email)
+      setResetMsg("Password reset email sent! Check your inbox.")
+      setTimeout(() => setResetMsg(""), 4000)
+    } catch {
+      setResetMsg("Failed to send reset email.")
+    }
+  }
+
+  const handleLogout = async () => {
+    await signOut()
+    setUser(null)
+    router.push("/login")
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -94,7 +98,7 @@ const handleLogout = async () => {
         <p className="text-muted-foreground">Manage your account preferences</p>
       </motion.div>
 
-      {/* Profile Section */}
+      {/* Profile */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -133,25 +137,30 @@ const handleLogout = async () => {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 h-11 bg-input border-border text-foreground"
+                  disabled
+                  className="pl-10 h-11 bg-input border-border text-muted-foreground opacity-60 cursor-not-allowed"
                 />
               </div>
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
             </div>
           </div>
+          {saveMsg && (
+            <p className={`text-sm ${saveMsg.includes("Failed") ? "text-destructive" : "text-success"}`}>
+              {saveMsg}
+            </p>
+          )}
           <div className="flex justify-end">
-<Button
-  onClick={handleSave}
-  className="bg-primary text-primary-foreground hover:bg-primary/90"
->
-  Save Changes
-</Button>
-
+            <Button
+              onClick={handleSave}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Save Changes
+            </Button>
           </div>
         </div>
       </motion.div>
 
-      {/* Preferences Section */}
+      {/* Preferences */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -169,7 +178,7 @@ const handleLogout = async () => {
         </div>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="currency" className="text-foreground">Currency</Label>
+            <Label className="text-foreground">Currency</Label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger className="h-11 bg-input border-border text-foreground max-w-xs">
                 <div className="flex items-center gap-2">
@@ -189,7 +198,7 @@ const handleLogout = async () => {
         </div>
       </motion.div>
 
-      {/* Notifications Section */}
+      {/* Notifications */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -206,40 +215,23 @@ const handleLogout = async () => {
           </div>
         </div>
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Push Notifications</p>
-              <p className="text-xs text-muted-foreground">Receive notifications about your expenses</p>
+          {[
+            { label: "Push Notifications", desc: "Receive notifications about your expenses", val: notifications, set: setNotifications },
+            { label: "Weekly Report", desc: "Get a weekly summary of your spending", val: weeklyReport, set: setWeeklyReport },
+            { label: "Budget Alerts", desc: "Get notified when you exceed budget limits", val: budgetAlerts, set: setBudgetAlerts },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-foreground">{item.label}</p>
+                <p className="text-xs text-muted-foreground">{item.desc}</p>
+              </div>
+              <Switch checked={item.val} onCheckedChange={item.set} />
             </div>
-            <Switch
-              checked={notifications}
-              onCheckedChange={setNotifications}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Weekly Report</p>
-              <p className="text-xs text-muted-foreground">Get a weekly summary of your spending</p>
-            </div>
-            <Switch
-              checked={weeklyReport}
-              onCheckedChange={setWeeklyReport}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-foreground">Budget Alerts</p>
-              <p className="text-xs text-muted-foreground">Get notified when you exceed budget limits</p>
-            </div>
-            <Switch
-              checked={budgetAlerts}
-              onCheckedChange={setBudgetAlerts}
-            />
-          </div>
+          ))}
         </div>
       </motion.div>
 
-      {/* Security Section */}
+      {/* Security */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -255,23 +247,28 @@ const handleLogout = async () => {
             <p className="text-sm text-muted-foreground">Manage your account security</p>
           </div>
         </div>
-        <div className="space-y-4">
-<Button
-  onClick={handleLogout}
-  variant="outline"
-  className="bg-secondary border-border text-foreground hover:bg-secondary/80"
->
-  Logout
-</Button>
-
-<Button
-  onClick={handleChangePassword}
-  variant="outline"
-  className="bg-secondary border-border text-foreground hover:bg-secondary/80"
->
-  Change Password
-</Button>
-
+        <div className="space-y-3">
+          <Button
+            onClick={handleChangePassword}
+            variant="outline"
+            className="bg-secondary border-border text-foreground hover:bg-secondary/80"
+          >
+            Change Password
+          </Button>
+          {resetMsg && (
+            <p className={`text-sm ${resetMsg.includes("Failed") ? "text-destructive" : "text-success"}`}>
+              {resetMsg}
+            </p>
+          )}
+          <div className="pt-2">
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="border-destructive/50 text-destructive hover:bg-destructive/10"
+            >
+              Log out
+            </Button>
+          </div>
         </div>
       </motion.div>
     </div>

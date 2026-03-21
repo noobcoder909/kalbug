@@ -15,8 +15,7 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/lib/useAuth"
 import { useRouter } from "next/navigation"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { signOut } from "@/lib/backendless-auth"
 import { useExpenses } from "@/lib/expenses-context"
 
 interface TopNavbarProps {
@@ -24,7 +23,7 @@ interface TopNavbarProps {
 }
 
 export function TopNavbar({ onMenuClick }: TopNavbarProps) {
-  const { user } = useAuth()
+  const { user, setUser } = useAuth()
   const router = useRouter()
   const { expenses, transactions, monthlyBudget, savingsGoal } = useExpenses()
 
@@ -38,29 +37,25 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
     .slice(0, 2)
 
   const handleLogout = async () => {
-    await signOut(auth)
+    await signOut()
+    setUser(null)
     router.push("/login")
   }
 
-  // Net savings = total deposits - total expenses across all transactions
   const totalDeposited = transactions.filter((t) => t.type === "deposit").reduce((s, t) => s + t.amount, 0)
   const totalSpent = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0)
-  // Also count expenses added directly (not via balance page)
   const directExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const netSaved = totalDeposited - Math.max(totalSpent, directExpenses)
 
-  // Current month stats
   const totalExpensesThisMonth = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const remaining = monthlyBudget - totalExpensesThisMonth
   const isOverBudget = totalExpensesThisMonth > monthlyBudget
   const savingsOnTrack = remaining >= savingsGoal
-
-  // Notification dot — show if any alert condition
   const hasAlert = isOverBudget || !savingsOnTrack
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
-      {/* Left side */}
+      {/* Left */}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
@@ -69,9 +64,7 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
         </Button>
-
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -81,30 +74,19 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
         </div>
       </div>
 
-      {/* Right side */}
+      {/* Right */}
       <div className="flex items-center gap-3">
-
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative text-foreground hover:bg-secondary">
               <Bell className="h-5 w-5" />
-              {hasAlert && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-red-500" />
-              )}
-              {!hasAlert && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-              )}
-              <span className="sr-only">Notifications</span>
+              <span className={`absolute top-1.5 right-1.5 h-2 w-2 rounded-full ${hasAlert ? "bg-red-500" : "bg-primary"}`} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-80 bg-popover border-border" align="end">
-            <DropdownMenuLabel className="text-foreground font-semibold">
-              Savings Summary
-            </DropdownMenuLabel>
+            <DropdownMenuLabel className="text-foreground font-semibold">Savings Summary</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border" />
-
-            {/* Net saved overall */}
             <div className="px-3 py-3 space-y-3">
               <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/60">
                 <div className="flex items-center gap-2">
@@ -119,15 +101,12 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
                   </div>
                 </div>
               </div>
-
-              {/* This month */}
               <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/60">
                 <div className="flex items-center gap-2">
                   <div className={`p-2 rounded-md ${remaining >= 0 ? "bg-primary/20" : "bg-red-500/20"}`}>
                     {remaining >= 0
                       ? <TrendingUp className="w-4 h-4 text-primary" />
-                      : <TrendingDown className="w-4 h-4 text-red-500" />
-                    }
+                      : <TrendingDown className="w-4 h-4 text-red-500" />}
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">This Month Remaining</p>
@@ -140,8 +119,6 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
                   <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">Over budget</span>
                 )}
               </div>
-
-              {/* Savings goal status */}
               <div className={`p-3 rounded-lg border text-xs ${
                 isOverBudget
                   ? "bg-red-500/10 border-red-500/30 text-red-400"
@@ -152,9 +129,8 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
                 {isOverBudget
                   ? "⚠️ You've exceeded your monthly budget!"
                   : !savingsOnTrack
-                  ? `⚠️ Savings goal of ₹${savingsGoal.toLocaleString()} may not be met this month.`
-                  : `✅ You're on track to save ₹${savingsGoal.toLocaleString()} this month!`
-                }
+                  ? `⚠️ Savings goal of ₹${savingsGoal.toLocaleString()} may not be met.`
+                  : `✅ You're on track to save ₹${savingsGoal.toLocaleString()} this month!`}
               </div>
             </div>
           </DropdownMenuContent>
@@ -186,7 +162,7 @@ export function TopNavbar({ onMenuClick }: TopNavbarProps) {
             <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem
               onClick={handleLogout}
-              className="text-foreground hover:bg-secondary cursor-pointer"
+              className="text-destructive hover:bg-destructive/10 cursor-pointer"
             >
               Log out
             </DropdownMenuItem>

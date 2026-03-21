@@ -5,21 +5,25 @@ const APP_ID = "A5192853-9A56-481E-9288-FC1D7ACD96D3"
 const REST_KEY = "A5570974-1283-4AB2-AD8E-40797731D561"
 const BASE_URL = `https://api.backendless.com/${APP_ID}/${REST_KEY}/data`
 
-const headers = {
-  "Content-Type": "application/json",
+function getAuthHeaders(): Record<string, string> {
+  const token =
+    typeof window !== "undefined" ? localStorage.getItem("bl_token") : null
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { "user-token": token } : {}),
+  }
 }
 
 // Generic fetch helper
 async function bFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    headers: { ...headers, ...options.headers },
+    headers: { ...getAuthHeaders(), ...options.headers },
   })
   if (!res.ok) {
     const err = await res.text()
     throw new Error(`Backendless error: ${err}`)
   }
-  // DELETE returns empty body
   const text = await res.text()
   return text ? JSON.parse(text) : null
 }
@@ -133,7 +137,6 @@ export async function saveUserSettings(data: {
   monthly_budget: number
   savings_goal: number
 }) {
-  // Check if settings already exist
   const existing = await getUserSettings(data.user_id)
   if (existing?.objectId) {
     return bFetch(`/user_settings/${existing.objectId}`, {
