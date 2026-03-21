@@ -1,4 +1,9 @@
 "use client"
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
+import { sendPasswordResetEmail } from "firebase/auth";
+
 import { useAuth } from "@/lib/useAuth";
 import { useEffect } from "react";
 import { updateProfile } from "firebase/auth";
@@ -34,9 +39,27 @@ export default function SettingsPage() {
 };
 
   const { user, loading } = useAuth();
+const handleChangePassword = async () => {
+  if (!user?.email) return;
 
-  const [name, setName] = useState("John Doe")
-  const [email, setEmail] = useState("john@example.com")
+  try {
+    await sendPasswordResetEmail(auth, user.email);
+    alert("Password reset email sent!");
+  } catch (error) {
+    console.error(error);
+    alert("Failed to send reset email.");
+  }
+};
+
+  useEffect(() => {
+  if (user) {
+    setName(user.displayName || "");
+    setEmail(user.email || "");
+  }
+}, [user]);
+
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
   const [currency, setCurrency] = useState("INR")
   const [notifications, setNotifications] = useState(true)
   const [weeklyReport, setWeeklyReport] = useState(true)
@@ -48,6 +71,16 @@ export default function SettingsPage() {
   }
 }, [user]);
 
+const router = useRouter();
+
+const handleLogout = async () => {
+  try {
+    await signOut(auth);
+    router.push("/login");
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -223,12 +256,22 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="space-y-4">
-          <Button variant="outline" className="bg-secondary border-border text-foreground hover:bg-secondary/80">
-            Change Password
-          </Button>
-          <Button variant="outline" className="bg-destructive/10 border-destructive/30 text-destructive hover:bg-destructive/20 ml-4">
-            Delete Account
-          </Button>
+<Button
+  onClick={handleLogout}
+  variant="outline"
+  className="bg-secondary border-border text-foreground hover:bg-secondary/80"
+>
+  Logout
+</Button>
+
+<Button
+  onClick={handleChangePassword}
+  variant="outline"
+  className="bg-secondary border-border text-foreground hover:bg-secondary/80"
+>
+  Change Password
+</Button>
+
         </div>
       </motion.div>
     </div>

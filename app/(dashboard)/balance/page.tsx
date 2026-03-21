@@ -1,12 +1,19 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Plus, TrendingUp, TrendingDown, IndianRupee, ArrowUpRight, ArrowDownRight } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  IndianRupee,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -15,14 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/dialog";
 import {
   AreaChart,
   Area,
@@ -32,82 +32,48 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-} from "recharts"
+} from "recharts";
 
-// Mock data for balance history
-const initialBalanceHistory = [
-  { date: "Mar 1", balance: 15000, deposits: 15000, spending: 0 },
-  { date: "Mar 5", balance: 14200, deposits: 0, spending: 800 },
-  { date: "Mar 8", balance: 13500, deposits: 0, spending: 700 },
-  { date: "Mar 10", balance: 18500, deposits: 5000, spending: 0 },
-  { date: "Mar 12", balance: 17800, deposits: 0, spending: 700 },
-  { date: "Mar 15", balance: 17100, deposits: 0, spending: 700 },
-  { date: "Mar 18", balance: 16500, deposits: 0, spending: 600 },
-  { date: "Mar 20", balance: 15800, deposits: 0, spending: 700 },
-]
-
-// Mock transactions
-const initialTransactions = [
-  { id: 1, type: "deposit", amount: 15000, description: "Initial deposit", date: "Mar 1" },
-  { id: 2, type: "expense", amount: 800, description: "Groceries", date: "Mar 5" },
-  { id: 3, type: "expense", amount: 700, description: "Transport", date: "Mar 8" },
-  { id: 4, type: "deposit", amount: 5000, description: "Part-time job", date: "Mar 10" },
-  { id: 5, type: "expense", amount: 700, description: "Food", date: "Mar 12" },
-  { id: 6, type: "expense", amount: 700, description: "Entertainment", date: "Mar 15" },
-  { id: 7, type: "expense", amount: 600, description: "Shopping", date: "Mar 18" },
-  { id: 8, type: "expense", amount: 700, description: "Bills", date: "Mar 20" },
-]
+import { useExpenses } from "@/lib/expenses-context";
 
 export default function BalancePage() {
-  const [balanceHistory, setBalanceHistory] = useState(initialBalanceHistory)
-  const [transactions, setTransactions] = useState(initialTransactions)
-  const [currentBalance, setCurrentBalance] = useState(15800)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [amount, setAmount] = useState("")
-  const [description, setDescription] = useState("")
-  const [transactionType, setTransactionType] = useState("deposit")
+  const { transactions, addExpense, currentBalance, totalDeposits, totalExpenses } = useExpenses();
 
-  const totalDeposits = transactions
-    .filter(t => t.type === "deposit")
-    .reduce((sum, t) => sum + t.amount, 0)
-  
-  const totalExpenses = transactions
-    .filter(t => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0)
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [transactionType, setTransactionType] = useState<"deposit" | "expense">("deposit");
 
-  const handleAddMoney = () => {
-    const amountNum = parseFloat(amount)
-    if (isNaN(amountNum) || amountNum <= 0) return
+  const handleAddTransaction = () => {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) return;
 
-    const today = new Date()
-    const dateStr = today.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    
-    const newTransaction = {
-      id: transactions.length + 1,
-      type: transactionType,
+    addExpense({
       amount: amountNum,
       description: description || (transactionType === "deposit" ? "Added funds" : "Expense"),
-      date: dateStr,
-    }
+      type: transactionType,
+    });
 
-    const newBalance = transactionType === "deposit" 
-      ? currentBalance + amountNum 
-      : currentBalance - amountNum
+    setAmount("");
+    setDescription("");
+    setDialogOpen(false);
+  };
 
-    const newHistoryEntry = {
-      date: dateStr,
-      balance: newBalance,
-      deposits: transactionType === "deposit" ? amountNum : 0,
-      spending: transactionType === "expense" ? amountNum : 0,
-    }
-
-    setTransactions([...transactions, newTransaction])
-    setBalanceHistory([...balanceHistory, newHistoryEntry])
-    setCurrentBalance(newBalance)
-    setAmount("")
-    setDescription("")
-    setDialogOpen(false)
-  }
+  // Generate balance history from transactions
+  const balanceHistory = transactions
+    .slice()
+    .reverse()
+    .reduce<{ date: string; balance: number; deposits: number; spending: number }[]>((acc, t) => {
+      const prevBalance = acc.length ? acc[acc.length - 1].balance : 0;
+      const newBalance = t.type === "deposit" ? prevBalance + t.amount : prevBalance - t.amount;
+      acc.push({
+        date: t.date,
+        balance: newBalance,
+        deposits: t.type === "deposit" ? t.amount : 0,
+        spending: t.type === "expense" ? t.amount : 0,
+      });
+      return acc;
+    }, []);
 
   return (
     <div className="space-y-6">
@@ -133,48 +99,39 @@ export default function BalancePage() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="type" className="text-foreground">Type</Label>
-                <Select value={transactionType} onValueChange={setTransactionType}>
-                  <SelectTrigger className="bg-secondary border-input text-foreground">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border">
-                    <SelectItem value="deposit" className="text-foreground hover:bg-secondary cursor-pointer">
-                      Deposit (Add Money)
-                    </SelectItem>
-                    <SelectItem value="expense" className="text-foreground hover:bg-secondary cursor-pointer">
-                      Expense (Deduct)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Type</Label>
+                <select
+                  value={transactionType}
+                  onChange={(e) => setTransactionType(e.target.value as any)}
+                  className="w-full p-2 rounded border bg-secondary text-foreground"
+                >
+                  <option value="deposit">Deposit (Add Money)</option>
+                  <option value="expense">Expense (Deduct)</option>
+                </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount" className="text-foreground">Amount (₹)</Label>
+                <Label>Amount (₹)</Label>
                 <Input
-                  id="amount"
                   type="number"
-                  placeholder="Enter amount"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="bg-secondary border-input text-foreground placeholder:text-muted-foreground"
+                  placeholder="Enter amount"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-foreground">Description</Label>
+                <Label>Description</Label>
                 <Input
-                  id="description"
-                  placeholder="e.g., Part-time job, Scholarship"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="bg-secondary border-input text-foreground placeholder:text-muted-foreground"
+                  placeholder="Optional"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-input text-foreground hover:bg-secondary">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddMoney} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button onClick={handleAddTransaction}>
                 {transactionType === "deposit" ? "Add Money" : "Record Expense"}
               </Button>
             </DialogFooter>
@@ -184,17 +141,15 @@ export default function BalancePage() {
 
       {/* Balance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Current Balance</p>
-                  <p className="text-3xl font-bold text-foreground mt-1">₹{currentBalance.toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">
+                    ₹{currentBalance.toLocaleString()}
+                  </p>
                   <p className="text-sm text-primary mt-2 flex items-center gap-1">
                     <TrendingUp className="w-4 h-4" />
                     Live balance
@@ -208,20 +163,15 @@ export default function BalancePage() {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Deposits</p>
                   <p className="text-3xl font-bold text-emerald-500 mt-1">₹{totalDeposits.toLocaleString()}</p>
                   <p className="text-sm text-emerald-500/80 mt-2 flex items-center gap-1">
-                    <ArrowUpRight className="w-4 h-4" />
-                    Money added
+                    <ArrowUpRight className="w-4 h-4" /> Money added
                   </p>
                 </div>
                 <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
@@ -232,20 +182,15 @@ export default function BalancePage() {
           </Card>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="bg-card/50 backdrop-blur-sm border-border overflow-hidden">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Spent</p>
                   <p className="text-3xl font-bold text-rose-500 mt-1">₹{totalExpenses.toLocaleString()}</p>
                   <p className="text-sm text-rose-500/80 mt-2 flex items-center gap-1">
-                    <ArrowDownRight className="w-4 h-4" />
-                    Money spent
+                    <ArrowDownRight className="w-4 h-4" /> Money spent
                   </p>
                 </div>
                 <div className="w-14 h-14 rounded-2xl bg-rose-500/20 flex items-center justify-center">
@@ -258,15 +203,13 @@ export default function BalancePage() {
       </div>
 
       {/* Balance History Chart */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card className="bg-card/50 backdrop-blur-sm border-border">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+        <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">Balance History</CardTitle>
-            <p className="text-sm text-muted-foreground">Track your balance over time based on deposits and spending</p>
+            <CardTitle>Balance History</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Track your balance over time
+            </p>
           </CardHeader>
           <CardContent>
             <div className="h-[350px]">
@@ -283,52 +226,19 @@ export default function BalancePage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="date"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    tickFormatter={(value) => `₹${value / 1000}k`}
-                  />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} tickFormatter={(val) => `₹${val / 1000}k`} />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
+                      borderRadius: 8,
                       color: "hsl(var(--foreground))",
                     }}
-                    formatter={(value: number, name: string) => {
-                      const labels: Record<string, string> = {
-                        balance: "Balance",
-                        deposits: "Deposits",
-                        spending: "Spending",
-                      }
-                      return [`₹${value.toLocaleString()}`, labels[name] || name]
-                    }}
+                    formatter={(value: number, name: string) => [`₹${value.toLocaleString()}`, name]}
                   />
-                  <Legend 
-                    wrapperStyle={{ color: "hsl(var(--foreground))" }}
-                    formatter={(value) => {
-                      const labels: Record<string, string> = {
-                        balance: "Balance",
-                        deposits: "Deposits",
-                        spending: "Spending",
-                      }
-                      return <span style={{ color: "hsl(var(--foreground))" }}>{labels[value] || value}</span>
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="balance"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    fill="url(#balanceGradient)"
-                  />
+                  <Legend />
+                  <Area type="monotone" dataKey="balance" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#balanceGradient)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -337,57 +247,46 @@ export default function BalancePage() {
       </motion.div>
 
       {/* Recent Transactions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card className="bg-card/50 backdrop-blur-sm border-border">
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <Card>
           <CardHeader>
-            <CardTitle className="text-foreground">Recent Transactions</CardTitle>
+            <CardTitle>Recent Transactions</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <AnimatePresence>
-                {[...transactions].reverse().slice(0, 6).map((transaction, index) => (
-                  <motion.div
-                    key={transaction.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        transaction.type === "deposit" 
-                          ? "bg-emerald-500/20" 
-                          : "bg-rose-500/20"
-                      }`}>
-                        {transaction.type === "deposit" ? (
-                          <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-                        ) : (
-                          <ArrowDownRight className="w-5 h-5 text-rose-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{transaction.description}</p>
-                        <p className="text-xs text-muted-foreground">{transaction.date}</p>
-                      </div>
+          <CardContent className="space-y-3">
+            <AnimatePresence>
+              {transactions.slice(0, 6).map((transaction) => (
+                <motion.div
+                  key={transaction.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        transaction.type === "deposit" ? "bg-emerald-500/20" : "bg-rose-500/20"
+                      }`}
+                    >
+                      {transaction.type === "deposit" ? (
+                        <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+                      ) : (
+                        <ArrowDownRight className="w-5 h-5 text-rose-500" />
+                      )}
                     </div>
-                    <p className={`text-sm font-semibold ${
-                      transaction.type === "deposit" 
-                        ? "text-emerald-500" 
-                        : "text-rose-500"
-                    }`}>
-                      {transaction.type === "deposit" ? "+" : "-"}₹{transaction.amount.toLocaleString()}
-                    </p>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{transaction.description}</p>
+                      <p className="text-xs text-muted-foreground">{transaction.date}</p>
+                    </div>
+                  </div>
+                  <p className={`text-sm font-semibold ${transaction.type === "deposit" ? "text-emerald-500" : "text-rose-500"}`}>
+                    {transaction.type === "deposit" ? "+" : "-"}₹{transaction.amount.toLocaleString()}
+                  </p>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </CardContent>
         </Card>
       </motion.div>
     </div>
-  )
+  );
 }

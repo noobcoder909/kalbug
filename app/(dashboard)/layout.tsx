@@ -1,84 +1,59 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { AppSidebar } from "@/components/app-sidebar"
-import { TopNavbar } from "@/components/top-navbar"
-import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useAuth } from "@/lib/useAuth";
-import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useState } from "react";
+import { AppSidebar } from "@/components/app-sidebar";
+import { TopNavbar } from "@/components/top-navbar";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
+import { ExpensesProvider } from "@/lib/expenses-context";
 
-const handleLogout = async () => {
-  await signOut(auth);
-};
-<button onClick={handleLogout}>
-  Logout
-</button>
-
-
-
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { user, loading } = useAuth();
-const router = useRouter();
-
-useEffect(() => {
-  if (!loading && !user) {
-    router.push("/login");
-  }
-}, [user, loading]);
-
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
-        <AppSidebar />
-      </div>
+    <ExpensesProvider>
+      <div className="min-h-screen bg-background">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <AppSidebar />
+        </div>
 
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-            />
-            <motion.div
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden"
-            >
-              <AppSidebar />
-              <button
+        {/* Mobile Sidebar Overlay */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="absolute top-4 right-4 p-1 rounded-md text-sidebar-foreground hover:bg-sidebar-accent"
+                className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
+              />
+              <motion.div
+                initial={{ x: -280 }}
+                animate={{ x: 0 }}
+                exit={{ x: -280 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="fixed inset-y-0 left-0 z-50 w-64 lg:hidden"
               >
-                <X className="h-5 w-5" />
-              </button>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                <AppSidebar />
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="absolute top-4 right-4 p-1 rounded-md text-sidebar-foreground hover:bg-sidebar-accent"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-      {/* Main Content */}
-      <div className="lg:pl-64">
-        <TopNavbar onMenuClick={() => setIsMobileMenuOpen(true)} />
-        <main className="p-6">{children}</main>
+        {/* Main Content */}
+        <div className="lg:pl-64">
+          <TopNavbar onMenuClick={() => setIsMobileMenuOpen(true)} />
+          <main className="p-6">{children}</main>
+        </div>
       </div>
-    </div>
-  )
+    </ExpensesProvider>
+  );
 }
