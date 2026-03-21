@@ -70,7 +70,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     router.push("/dashboard");
 
   } catch (error: any) {
-  console.error(error.code);
+  
 
   if (error.code === "auth/email-already-in-use") {
     setErrorMsg("Account already exists. Please login.");

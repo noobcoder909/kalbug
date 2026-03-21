@@ -2,60 +2,55 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Users, ArrowUpRight, ArrowDownLeft, Plus, Trash2, Calendar } from "lucide-react"
+import { Users, ArrowUpRight, ArrowDownLeft, Plus, Trash2, Calendar, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog"
 import { useExpenses } from "@/lib/expenses-context"
+import { useAuth } from "@/lib/useAuth"
+import {
+  getFriends,
+  addFriend,
+  updateFriend,
+  getFriendTransactions,
+  addFriendTransaction,
+  deleteFriendTransaction,
+} from "@/lib/backendless"
 
 interface Friend {
-  id: string
-  name: string
+  objectId: string
+  friend_name: string
   lent: number
   borrowed: number
 }
 
 interface FriendTransaction {
-  id: string
-  friendName: string
+  objectId: string
+  friend_name: string
   type: "lent" | "borrowed"
   amount: number
-  date: string
+  transaction_date: string
 }
-
-const STORAGE_KEY = "friends-data-v2"
 
 export default function FriendsPage() {
   const { addExpense } = useExpenses()
+  const { user } = useAuth()
 
   const [friends, setFriends] = useState<Friend[]>([])
   const [transactions, setTransactions] = useState<FriendTransaction[]>([])
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [newTransaction, setNewTransaction] = useState({
     friendName: "",
     type: "lent" as "lent" | "borrowed",
@@ -63,116 +58,122 @@ export default function FriendsPage() {
     date: new Date().toISOString().split("T")[0],
   })
 
-  // Load from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      setFriends(parsed.friends || [])
-      setTransactions(parsed.transactions || [])
-    }
-    setIsLoaded(true)
-  }, [])
+    if (!user) return
+    loadData()
+  }, [user])
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    if (!isLoaded) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ friends, transactions }))
-  }, [friends, transactions, isLoaded])
+  const loadData = async () => {
+    if (!user) return
+    setPageLoading(true)
+    try {
+      const [friendsData, txData] = await Promise.all([
+        getFriends(user.uid),
+        getFriendTransactions(user.uid),
+      ])
+      setFriends(friendsData || [])
+      setTransactions(txData || [])
+    } catch (err) {
+      console.error("Failed to load friends data:", err)
+    } finally {
+      setPageLoading(false)
+    }
+  }
 
   const totalLent = friends.reduce((acc, f) => acc + f.lent, 0)
   const totalBorrowed = friends.reduce((acc, f) => acc + f.borrowed, 0)
   const netBalance = totalLent - totalBorrowed
 
-  const handleAddTransaction = () => {
-    if (!newTransaction.friendName || !newTransaction.amount) return
+  const handleAddTransaction = async () => {
+    if (!newTransaction.friendName || !newTransaction.amount || !user) return
     const amount = parseFloat(newTransaction.amount)
     if (isNaN(amount) || amount <= 0) return
 
-    // Add to friend transactions list
-    const transaction: FriendTransaction = {
-      id: Date.now().toString(),
-      friendName: newTransaction.friendName,
-      type: newTransaction.type,
-      amount,
-      date: newTransaction.date,
-    }
-    setTransactions((prev) => [transaction, ...prev])
+    setSubmitting(true)
+    try {
+      const savedTx = await addFriendTransaction({
+        user_id: user.uid,
+        friend_name: newTransaction.friendName,
+        type: newTransaction.type,
+        amount,
+        transaction_date: newTransaction.date,
+      })
+      setTransactions((prev) => [savedTx, ...prev])
 
-    // Update or add friend balance
-    const existingFriend = friends.find(
-      (f) => f.name.toLowerCase() === newTransaction.friendName.toLowerCase()
-    )
-    if (existingFriend) {
-      setFriends((prev) =>
-        prev.map((f) =>
-          f.id === existingFriend.id
-            ? {
-                ...f,
-                lent: newTransaction.type === "lent" ? f.lent + amount : f.lent,
-                borrowed: newTransaction.type === "borrowed" ? f.borrowed + amount : f.borrowed,
-              }
-            : f
-        )
+      const existing = friends.find(
+        (f) => f.friend_name.toLowerCase() === newTransaction.friendName.toLowerCase()
       )
-    } else {
-      const newFriend: Friend = {
-        id: Date.now().toString(),
-        name: newTransaction.friendName,
-        lent: newTransaction.type === "lent" ? amount : 0,
-        borrowed: newTransaction.type === "borrowed" ? amount : 0,
+
+      if (existing) {
+        const updatedLent =
+          newTransaction.type === "lent" ? existing.lent + amount : existing.lent
+        const updatedBorrowed =
+          newTransaction.type === "borrowed" ? existing.borrowed + amount : existing.borrowed
+        await updateFriend(existing.objectId, { lent: updatedLent, borrowed: updatedBorrowed })
+        setFriends((prev) =>
+          prev.map((f) =>
+            f.objectId === existing.objectId
+              ? { ...f, lent: updatedLent, borrowed: updatedBorrowed }
+              : f
+          )
+        )
+      } else {
+        const newFriend = await addFriend({
+          user_id: user.uid,
+          friend_name: newTransaction.friendName,
+          lent: newTransaction.type === "lent" ? amount : 0,
+          borrowed: newTransaction.type === "borrowed" ? amount : 0,
+        })
+        setFriends((prev) => [...prev, newFriend])
       }
-      setFriends((prev) => [...prev, newFriend])
-    }
 
-    // Lent = money goes out → expense (balance decreases, counted as expense)
-    // Borrowed = money comes in → deposit (balance increases)
-    if (newTransaction.type === "lent") {
-      addExpense({
-        description: `Lent to ${newTransaction.friendName}`,
-        amount,
-        type: "expense",
-      } as any)
-    } else {
-      addExpense({
-        description: `Borrowed from ${newTransaction.friendName}`,
-        amount,
-        type: "deposit",
-      } as any)
-    }
+      if (newTransaction.type === "lent") {
+        addExpense({
+          description: `Lent to ${newTransaction.friendName}`,
+          amount,
+          type: "expense",
+        })
+      } else {
+        addExpense({
+          description: `Borrowed from ${newTransaction.friendName}`,
+          amount,
+          type: "deposit",
+        })
+      }
 
-    setNewTransaction({
-      friendName: "",
-      type: "lent",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
-    })
-    setIsAddOpen(false)
+      setNewTransaction({
+        friendName: "",
+        type: "lent",
+        amount: "",
+        date: new Date().toISOString().split("T")[0],
+      })
+      setIsAddOpen(false)
+    } catch (err) {
+      console.error("Failed to add friend transaction:", err)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleDeleteTransaction = (id: string) => {
-    const transaction = transactions.find((t) => t.id === id)
-    if (!transaction) return
+  const handleDeleteTransaction = async (objectId: string) => {
+    try {
+      await deleteFriendTransaction(objectId)
+      setTransactions((prev) => prev.filter((t) => t.objectId !== objectId))
+    } catch (err) {
+      console.error("Failed to delete transaction:", err)
+    }
+  }
 
-    // Reverse the friend balance
-    setFriends((prev) =>
-      prev.map((f) => {
-        if (f.name.toLowerCase() === transaction.friendName.toLowerCase()) {
-          return {
-            ...f,
-            lent: transaction.type === "lent" ? f.lent - transaction.amount : f.lent,
-            borrowed: transaction.type === "borrowed" ? f.borrowed - transaction.amount : f.borrowed,
-          }
-        }
-        return f
-      })
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
     )
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Friends & Lending</h1>
@@ -181,8 +182,7 @@ export default function FriendsPage() {
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Transaction
+              <Plus className="w-4 h-4 mr-2" /> Add Transaction
             </Button>
           </DialogTrigger>
           <DialogContent className="glass border-border sm:max-w-[425px]">
@@ -199,9 +199,8 @@ export default function FriendsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="friendName" className="text-foreground">Friend Name</Label>
+                <Label className="text-foreground">Friend Name</Label>
                 <Input
-                  id="friendName"
                   value={newTransaction.friendName}
                   onChange={(e) => setNewTransaction({ ...newTransaction, friendName: e.target.value })}
                   placeholder="Enter friend's name"
@@ -209,30 +208,29 @@ export default function FriendsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="type" className="text-foreground">Type</Label>
+                <Label className="text-foreground">Type</Label>
                 <Select
                   value={newTransaction.type}
-                  onValueChange={(value: "lent" | "borrowed") =>
-                    setNewTransaction({ ...newTransaction, type: value })
+                  onValueChange={(v: "lent" | "borrowed") =>
+                    setNewTransaction({ ...newTransaction, type: v })
                   }
                 >
                   <SelectTrigger className="bg-secondary border-border text-foreground">
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-popover border-border">
-                    <SelectItem value="lent" className="text-foreground hover:bg-secondary cursor-pointer">
+                    <SelectItem value="lent" className="text-foreground cursor-pointer">
                       Lent (You gave money) — counts as expense
                     </SelectItem>
-                    <SelectItem value="borrowed" className="text-foreground hover:bg-secondary cursor-pointer">
+                    <SelectItem value="borrowed" className="text-foreground cursor-pointer">
                       Borrowed (You received money)
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="amount" className="text-foreground">Amount (₹)</Label>
+                <Label className="text-foreground">Amount (₹)</Label>
                 <Input
-                  id="amount"
                   type="number"
                   value={newTransaction.amount}
                   onChange={(e) => setNewTransaction({ ...newTransaction, amount: e.target.value })}
@@ -241,9 +239,8 @@ export default function FriendsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date" className="text-foreground">Date</Label>
+                <Label className="text-foreground">Date</Label>
                 <Input
-                  id="date"
                   type="date"
                   value={newTransaction.date}
                   onChange={(e) => setNewTransaction({ ...newTransaction, date: e.target.value })}
@@ -261,8 +258,10 @@ export default function FriendsPage() {
               </Button>
               <Button
                 onClick={handleAddTransaction}
+                disabled={submitting}
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
+                {submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 Add Transaction
               </Button>
             </DialogFooter>
@@ -270,122 +269,85 @@ export default function FriendsPage() {
         </Dialog>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="glass rounded-xl p-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-success/20">
-              <ArrowUpRight className="w-5 h-5 text-success" />
+        {[
+          { label: "Total Lent", value: totalLent, color: "text-success", bg: "bg-success/20", Icon: ArrowUpRight, iconColor: "text-success" },
+          { label: "Total Borrowed", value: totalBorrowed, color: "text-destructive", bg: "bg-destructive/20", Icon: ArrowDownLeft, iconColor: "text-destructive" },
+          { label: "Net Balance", value: netBalance, color: netBalance >= 0 ? "text-success" : "text-destructive", bg: "bg-primary/20", Icon: Users, iconColor: "text-primary" },
+        ].map((card, i) => (
+          <motion.div
+            key={card.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="glass rounded-xl p-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-lg ${card.bg}`}>
+                <card.Icon className={`w-5 h-5 ${card.iconColor}`} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+                <p className={`text-2xl font-bold ${card.color}`}>
+                  {card.value >= 0 && card.label === "Net Balance" ? "+" : ""}₹{card.value.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Lent</p>
-              <p className="text-2xl font-bold text-success">₹{totalLent.toLocaleString()}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="glass rounded-xl p-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-destructive/20">
-              <ArrowDownLeft className="w-5 h-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Borrowed</p>
-              <p className="text-2xl font-bold text-destructive">₹{totalBorrowed.toLocaleString()}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-          className="glass rounded-xl p-6"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-lg bg-primary/20">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Net Balance</p>
-              <p className={`text-2xl font-bold ${netBalance >= 0 ? "text-success" : "text-destructive"}`}>
-                {netBalance >= 0 ? "+" : ""}₹{netBalance.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Friends List */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
-        className="glass rounded-xl p-6"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="glass rounded-xl p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Friends Overview</h2>
         <div className="space-y-3">
-          <AnimatePresence>
-            {friends.map((friend, index) => {
-              const net = friend.lent - friend.borrowed
-              return (
-                <motion.div
-                  key={friend.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2, delay: index * 0.05 }}
-                  className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-primary">
-                        {friend.name.split(" ").map((n) => n[0]).join("")}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">{friend.name}</p>
-                      <div className="flex gap-4 text-sm text-muted-foreground">
-                        <span>Lent: ₹{friend.lent.toLocaleString()}</span>
-                        <span>Borrowed: ₹{friend.borrowed.toLocaleString()}</span>
+          {friends.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No friends added yet. Add a transaction to get started.
+            </p>
+          ) : (
+            <AnimatePresence>
+              {friends.map((friend, i) => {
+                const net = friend.lent - friend.borrowed
+                return (
+                  <motion.div
+                    key={friend.objectId}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-primary">
+                          {friend.friend_name.split(" ").map((n) => n[0]).join("").toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{friend.friend_name}</p>
+                        <div className="flex gap-4 text-sm text-muted-foreground">
+                          <span>Lent: ₹{friend.lent.toLocaleString()}</span>
+                          <span>Borrowed: ₹{friend.borrowed.toLocaleString()}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>
-                      {net >= 0 ? "+" : ""}₹{net.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {net >= 0 ? "They owe you" : "You owe them"}
-                    </p>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </AnimatePresence>
-          {friends.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No friends added yet. Add a transaction to get started.</p>
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>
+                        {net >= 0 ? "+" : ""}₹{net.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {net >= 0 ? "They owe you" : "You owe them"}
+                      </p>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
           )}
         </div>
       </motion.div>
 
-      {/* Transaction History */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.4 }}
-        className="glass rounded-xl p-6"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="glass rounded-xl p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Transaction History</h2>
         <div className="overflow-x-auto">
           <Table>
@@ -400,59 +362,42 @@ export default function FriendsPage() {
             </TableHeader>
             <TableBody>
               <AnimatePresence>
-                {transactions.map((transaction, index) => (
+                {transactions.map((tx, i) => (
                   <motion.tr
-                    key={transaction.id}
+                    key={tx.objectId}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2, delay: index * 0.03 }}
+                    transition={{ delay: i * 0.03 }}
                     className="border-border hover:bg-secondary/50"
                   >
-                    <TableCell className="text-foreground font-medium">
-                      {transaction.friendName}
-                    </TableCell>
+                    <TableCell className="text-foreground font-medium">{tx.friend_name}</TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          transaction.type === "lent"
-                            ? "bg-success/20 text-success"
-                            : "bg-destructive/20 text-destructive"
-                        }`}
-                      >
-                        {transaction.type === "lent" ? (
-                          <ArrowUpRight className="w-3 h-3" />
-                        ) : (
-                          <ArrowDownLeft className="w-3 h-3" />
-                        )}
-                        {transaction.type === "lent" ? "Lent" : "Borrowed"}
-                        {transaction.type === "lent" && (
-                          <span className="ml-1 text-xs opacity-70">(expense)</span>
-                        )}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        tx.type === "lent" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
+                      }`}>
+                        {tx.type === "lent"
+                          ? <ArrowUpRight className="w-3 h-3" />
+                          : <ArrowDownLeft className="w-3 h-3" />}
+                        {tx.type === "lent" ? "Lent" : "Borrowed"}
+                        {tx.type === "lent" && <span className="ml-1 opacity-70">(expense)</span>}
                       </span>
                     </TableCell>
-                    <TableCell className="text-foreground">
-                      ₹{transaction.amount.toLocaleString()}
-                    </TableCell>
+                    <TableCell className="text-foreground">₹{tx.amount.toLocaleString()}</TableCell>
                     <TableCell className="text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {new Date(transaction.date).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {tx.transaction_date}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteTransaction(transaction.id)}
+                        onClick={() => handleDeleteTransaction(tx.objectId)}
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="w-4 h-4" />
-                        <span className="sr-only">Delete transaction</span>
                       </Button>
                     </TableCell>
                   </motion.tr>

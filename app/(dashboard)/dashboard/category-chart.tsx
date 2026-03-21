@@ -1,49 +1,46 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 import { useExpenses } from "@/lib/expenses-context"
+import { Loader2 } from "lucide-react"
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Food:          "oklch(0.65 0.2 160)",
-  Transport:     "oklch(0.55 0.18 200)",
-  Entertainment: "oklch(0.7 0.15 80)",
-  Shopping:      "oklch(0.6 0.2 300)",
-  Utilities:     "oklch(0.55 0.22 25)",
-  Health:        "oklch(0.65 0.18 140)",
-  Education:     "oklch(0.6 0.2 240)",
-  Friends:       "oklch(0.65 0.2 60)",
-  Other:         "oklch(0.5 0.05 260)",
+const CATEGORY_CONFIG: Record<string, { color: string; emoji: string }> = {
+  Food:          { color: "#00c878", emoji: "🍔" },
+  Transport:     { color: "#3b82f6", emoji: "🚌" },
+  Entertainment: { color: "#f59e0b", emoji: "🎮" },
+  Shopping:      { color: "#a855f7", emoji: "🛍️" },
+  Utilities:     { color: "#ef4444", emoji: "⚡" },
+  Health:        { color: "#06b6d4", emoji: "💊" },
+  Education:     { color: "#8b5cf6", emoji: "📚" },
+  Friends:       { color: "#f97316", emoji: "👥" },
+  Other:         { color: "#6b7280", emoji: "📦" },
 }
 
 const FALLBACK_COLORS = [
-  "oklch(0.65 0.2 160)",
-  "oklch(0.55 0.18 200)",
-  "oklch(0.7 0.15 80)",
-  "oklch(0.6 0.2 300)",
-  "oklch(0.55 0.22 25)",
-  "oklch(0.65 0.18 140)",
-  "oklch(0.6 0.2 240)",
-  "oklch(0.65 0.2 60)",
+  "#00c878", "#3b82f6", "#f59e0b", "#a855f7",
+  "#ef4444", "#06b6d4", "#8b5cf6", "#f97316",
 ]
 
 export function CategoryChart() {
-  const { expenses } = useExpenses()
+  const { expenses, loading } = useExpenses()
 
-  // Group by category
   const categoryMap: Record<string, number> = {}
   expenses.forEach((e) => {
     const cat = e.category || "Other"
     categoryMap[cat] = (categoryMap[cat] || 0) + e.amount
   })
 
-  const data = Object.entries(categoryMap).map(([name, value], i) => ({
-    name,
-    value,
-    color: CATEGORY_COLORS[name] || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-  }))
+  const total = Object.values(categoryMap).reduce((s, v) => s + v, 0)
 
-  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const data = Object.entries(categoryMap)
+    .map(([name, value], i) => ({
+      name,
+      value,
+      pct: total > 0 ? (value / total) * 100 : 0,
+      color: CATEGORY_CONFIG[name]?.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+      emoji: CATEGORY_CONFIG[name]?.emoji || "📦",
+    }))
+    .sort((a, b) => b.value - a.value)
 
   return (
     <motion.div
@@ -53,60 +50,64 @@ export function CategoryChart() {
       className="glass rounded-xl p-6"
     >
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-foreground">Expenses by Category</h3>
+        <h3 className="text-lg font-semibold text-foreground">Spending by Category</h3>
         <p className="text-sm text-muted-foreground">Where your money goes</p>
       </div>
 
-      {data.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-          No expense data yet. Add some expenses to see your category breakdown.
+      {loading ? (
+        <div className="h-[260px] flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : data.length === 0 ? (
+        <div className="h-[260px] flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-2xl">🗂️</span>
+          </div>
+          <p className="text-sm text-muted-foreground">No categories yet.<br />Add expenses to see the breakdown.</p>
         </div>
       ) : (
-        <div className="flex flex-col lg:flex-row items-center gap-6">
-          <div className="h-[200px] w-[200px] shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={data}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "oklch(0.12 0.01 260)",
-                    border: "1px solid oklch(0.22 0.01 260)",
-                    borderRadius: "8px",
-                    color: "oklch(0.95 0 0)",
-                  }}
-                  formatter={(value: number) => [`₹${value.toFixed(2)}`, ""]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="flex-1 space-y-3 w-full">
-            {data.map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
+        <div className="space-y-4">
+          {data.map((item, i) => (
+            <motion.div
+              key={item.name}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06 }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm text-foreground">{item.name}</span>
+                  <span className="text-base">{item.emoji}</span>
+                  <span className="text-sm font-medium text-foreground">{item.name}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-foreground">₹{item.value.toFixed(2)}</span>
-                  <span className="text-xs text-muted-foreground w-12 text-right">
-                    {total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%
+                  <span className="text-sm font-semibold text-foreground">
+                    ₹{item.value.toLocaleString()}
+                  </span>
+                  <span
+                    className="text-xs font-medium px-1.5 py-0.5 rounded-md min-w-[38px] text-center"
+                    style={{ background: `${item.color}20`, color: item.color }}
+                  >
+                    {item.pct.toFixed(0)}%
                   </span>
                 </div>
               </div>
-            ))}
+              {/* Progress bar */}
+              <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: item.color }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${item.pct}%` }}
+                  transition={{ duration: 0.6, delay: 0.2 + i * 0.06, ease: "easeOut" }}
+                />
+              </div>
+            </motion.div>
+          ))}
+
+          {/* Total */}
+          <div className="pt-3 mt-2 border-t border-border flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total spent</span>
+            <span className="text-sm font-bold text-foreground">₹{total.toLocaleString()}</span>
           </div>
         </div>
       )}
