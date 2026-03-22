@@ -1,8 +1,6 @@
 // lib/backendless.ts
-// Backendless REST API client for KalBudget
-
-const APP_ID = "A5192853-9A56-481E-9288-FC1D7ACD96D3"
-const REST_KEY = "A5570974-1283-4AB2-AD8E-40797731D561"
+const APP_ID = process.env.NEXT_PUBLIC_BACKENDLESS_APP_ID!
+const REST_KEY = process.env.NEXT_PUBLIC_BACKENDLESS_REST_KEY!
 const BASE_URL = `https://api.backendless.com/${APP_ID}/${REST_KEY}/data`
 
 function getAuthHeaders(): Record<string, string> {
@@ -14,7 +12,6 @@ function getAuthHeaders(): Record<string, string> {
   }
 }
 
-// Generic fetch helper
 async function bFetch(path: string, options: RequestInit = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,

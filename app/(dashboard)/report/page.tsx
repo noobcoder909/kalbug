@@ -57,9 +57,9 @@ export default function ReportPage() {
 
     try {
       const payload = {
-        service_id: "service_7kl95ry",
-        template_id: "template_qfcawci",
-        user_id: "y31UqQRcIUXS9lcmA",
+service_id: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+template_id: process.env.NEXT_PUBLIC_EMAILJS_CONTACT_TEMPLATE,
+user_id: process.env.NEXT_PUBLIC_EMAILJS_USER_ID,
         template_params: {
           from_name: name,
           from_email: email || "Not provided",

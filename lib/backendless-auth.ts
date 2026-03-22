@@ -1,14 +1,13 @@
 // lib/backendless-auth.ts
-// Backendless Authentication client for KalBudget
-
-const APP_ID = "A5192853-9A56-481E-9288-FC1D7ACD96D3"
-const REST_KEY = "A5570974-1283-4AB2-AD8E-40797731D561"
+const APP_ID = process.env.NEXT_PUBLIC_BACKENDLESS_APP_ID!
+const REST_KEY = process.env.NEXT_PUBLIC_BACKENDLESS_REST_KEY!
 const BASE_URL = `https://api.backendless.com/${APP_ID}/${REST_KEY}`
 
-const EMAILJS_SERVICE_ID = "service_7kl95ry"
-const EMAILJS_USER_ID = "y31UqQRcIUXS9lcmA"
+const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID!
+const EMAILJS_USER_ID = process.env.NEXT_PUBLIC_EMAILJS_USER_ID!
+const EMAILJS_WELCOME_TEMPLATE = process.env.NEXT_PUBLIC_EMAILJS_WELCOME_TEMPLATE!
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// ─── TYPES ───────────────────────────────────────────────────────────────────
 
 export type BLUser = {
   objectId: string
@@ -20,7 +19,7 @@ export type BLUser = {
   "user-token": string
 }
 
-// ─── SESSION ──────────────────────────────────────────────────────────────────
+// ─── SESSION ─────────────────────────────────────────────────────────────────
 
 const USER_KEY = "bl_user"
 const TOKEN_KEY = "bl_token"
@@ -78,7 +77,7 @@ async function bFetch(path: string, options: RequestInit = {}) {
   return data
 }
 
-// ─── AUTH ─────────────────────────────────────────────────────────────────────
+// ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export async function signUpWithEmail(
   email: string,
@@ -166,7 +165,7 @@ export async function sendWelcomeEmail(
 
   const payload = {
     service_id: EMAILJS_SERVICE_ID,
-    template_id: "template_trg8t22",
+    template_id: EMAILJS_WELCOME_TEMPLATE,
     user_id: EMAILJS_USER_ID,
     template_params: {
       from_name: "KalBudget",
