@@ -38,7 +38,6 @@ KalBudget is a full-stack expense tracking web application that helps users mana
 
 ## 📸 Screenshots
 
-> Add your screenshots here
 
 ![Dashboard]<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c3849365-80b3-4105-8338-64ff14a92950" />
 
